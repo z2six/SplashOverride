@@ -182,7 +182,7 @@ public final class SplashSources {
             }
 
             // Expected: /user/repo/blob/branch/path/to/file
-            String path = uri.getPath(); // e.g. /z2six/SplashOverride/blob/master/src/main/splashes.txt
+            String path = uri.getPath();
             String[] parts = path.split("/");
             // parts[0] is "", parts[1]=user, parts[2]=repo, parts[3]="blob", parts[4]=branch, rest=file path
             if (parts.length < 5) {

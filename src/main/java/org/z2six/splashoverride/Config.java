@@ -44,8 +44,8 @@ public class Config {
                             Supports regular text URLs and GitHub "blob" URLs – the mod will automatically
                             convert GitHub blob links to their corresponding raw.githubusercontent.com URLs.
                             Example:
-                            https://github.com/z2six/SplashOverride/blob/master/src/main/splashes.txt""")
-                    .define("remoteUrl", "https://github.com/z2six/SplashOverride/blob/master/src/main/splashes.txt");
+                            https://github.com/z2six/SplashOverride/blob/master/splashes.txt""")
+                    .define("remoteUrl", "https://github.com/z2six/SplashOverride/blob/master/splashes.txt");
 
     // A local, user-editable list of splash texts
     private static final ModConfigSpec.ConfigValue<List<? extends String>> LOCAL_SPLASHES =
