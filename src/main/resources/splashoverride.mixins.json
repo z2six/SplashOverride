@@ -3,14 +3,10 @@
   "minVersion": "0.8",
   "package": "org.z2six.splashoverride.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [
-  ],
   "client": [
+    "SplashManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "overwrites": {
-    "requireAnnotations": true
   }
 }

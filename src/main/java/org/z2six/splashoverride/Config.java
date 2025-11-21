@@ -1,51 +1,122 @@
-// src/main/java/org/z2six/Config.java
+// MainFile: src/main/java/org/z2six/splashoverride/Config.java
 package org.z2six.splashoverride;
 
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-// An example config class. This is not required, but it's a good idea to have one to keep your config organized.
-// Demonstrates how to use Neo's config APIs
+/**
+ * Client config for SplashOverride.
+ *
+ * Controls:
+ * - Whether to load splashes from a remote URL.
+ * - The remote URL itself.
+ * - A local list of splashes editable directly in the config file.
+ */
 @EventBusSubscriber(modid = Splashoverride.MODID, bus = EventBusSubscriber.Bus.MOD)
 public class Config {
+
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    private static final ModConfigSpec.BooleanValue LOG_DIRT_BLOCK = BUILDER.comment("Whether to log the dirt block on common setup").define("logDirtBlock", true);
+    // Whether we attempt to fetch splashes from a remote URL
+    private static final ModConfigSpec.BooleanValue USE_REMOTE_SOURCE =
+            BUILDER.comment("""
+                            If true, SplashOverride fetches splashes from the configured remoteUrl.
+                            On first use this session:
+                              - If the remote request succeeds and returns valid lines, those are used
+                                and cached for the rest of the session.
+                              - If the remote request fails or returns no valid lines, localSplashes
+                                are used instead (and cached).
+                            
+                            Once a splash list has been successfully built, it is cached in memory and reused
+                            for the rest of this game session, until the config is reloaded or changed.""")
+                    .define("useRemoteSource", true);
 
-    private static final ModConfigSpec.IntValue MAGIC_NUMBER = BUILDER.comment("A magic number").defineInRange("magicNumber", 42, 0, Integer.MAX_VALUE);
+    // The remote URL used to fetch splashes (one line per splash)
+    private static final ModConfigSpec.ConfigValue<String> REMOTE_URL =
+            BUILDER.comment("""
+                            Remote URL for splashes. One line = one splash.
+                            Supports regular text URLs and GitHub "blob" URLs – the mod will automatically
+                            convert GitHub blob links to their corresponding raw.githubusercontent.com URLs.
+                            Example:
+                            https://github.com/z2six/SplashOverride/blob/master/src/main/splashes.txt""")
+                    .define("remoteUrl", "https://github.com/z2six/SplashOverride/blob/master/src/main/splashes.txt");
 
-    public static final ModConfigSpec.ConfigValue<String> MAGIC_NUMBER_INTRODUCTION = BUILDER.comment("What you want the introduction message to be for the magic number").define("magicNumberIntroduction", "The magic number is... ");
+    // A local, user-editable list of splash texts
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> LOCAL_SPLASHES =
+            BUILDER.comment("""
+                            Local splash entries. One string per splash.
+                            Empty or comment-style lines (starting with '#') are ignored.
+                            
+                            These are used:
+                              - When useRemoteSource = false, OR
+                              - As a fallback if the remote URL fails or returns nothing
+                                on first use this session.
+                            
+                            Once a splash list (remote OR local) has been built, it is cached in memory
+                            and reused until the config is reloaded.""")
+                    .defineListAllowEmpty(
+                            "localSplashes",
+                            List.of(
+                                    "Welcome to Minecraft!",
+                                    "Custom splashes from SplashOverride (local fallback).",
+                                    "Edit localSplashes in the config to customize these messages."
+                            ),
+                            obj -> obj instanceof String
+                    );
 
-    // a list of strings that are treated as resource locations for items
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER.comment("A list of items to log on common setup.").defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), Config::validateItemName);
+    // The actual spec we register as a CLIENT config
+    static final ModConfigSpec CLIENT_SPEC = BUILDER.build();
 
-    static final ModConfigSpec SPEC = BUILDER.build();
-
-    public static boolean logDirtBlock;
-    public static int magicNumber;
-    public static String magicNumberIntroduction;
-    public static Set<Item> items;
-
-    private static boolean validateItemName(final Object obj) {
-        return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse(itemName));
-    }
+    // Runtime values, updated whenever the config is loaded/reloaded
+    public static boolean useRemoteSource = true;
+    public static String remoteUrl = "";
+    public static List<String> localSplashes = Collections.emptyList();
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
-        logDirtBlock = LOG_DIRT_BLOCK.get();
-        magicNumber = MAGIC_NUMBER.get();
-        magicNumberIntroduction = MAGIC_NUMBER_INTRODUCTION.get();
+        if (event.getConfig().getSpec() != CLIENT_SPEC) {
+            return;
+        }
 
-        // convert the list of strings into a set of items
-        items = ITEM_STRINGS.get().stream().map(itemName -> BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemName))).collect(Collectors.toSet());
+        useRemoteSource = USE_REMOTE_SOURCE.get();
+        remoteUrl = REMOTE_URL.get();
+
+        List<String> cleaned = new ArrayList<>();
+        for (Object obj : LOCAL_SPLASHES.get()) {
+            if (!(obj instanceof String s)) {
+                continue;
+            }
+            String trimmed = s.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (trimmed.startsWith("#")) { // allow comments
+                continue;
+            }
+            cleaned.add(trimmed);
+        }
+
+        localSplashes = List.copyOf(cleaned);
+
+        Splashoverride.LOGGER.info(
+                "[SplashOverride] Config loaded: useRemoteSource={}, remoteUrl='{}', localSplashes={}",
+                useRemoteSource,
+                remoteUrl,
+                localSplashes.size()
+        );
+
+        // Invalidate any previously cached list so new config values are picked up
+        SplashSources.invalidateCache();
+        Splashoverride.LOGGER.debug("[SplashOverride] Splash cache invalidated due to config reload.");
+    }
+
+    private Config() {
+        // no-op
     }
 }
