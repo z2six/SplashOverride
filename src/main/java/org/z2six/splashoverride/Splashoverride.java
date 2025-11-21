@@ -1,3 +1,4 @@
+// src/main/java/org/z2six/Splashoverride.java
 package org.z2six.splashoverride;
 
 import com.mojang.logging.LogUtils;

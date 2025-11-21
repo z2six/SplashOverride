@@ -1,3 +1,4 @@
+// src/main/java/org/z2six/Config.java
 package org.z2six.splashoverride;
 
 import net.minecraft.core.registries.BuiltInRegistries;
